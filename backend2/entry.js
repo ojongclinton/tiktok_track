@@ -332,35 +332,274 @@ class TikTokScraper {
         // Simulate reading time before processing
         await this.delay(Math.random() * 1000 + 500);
 
-        // Parse HTML (if scraping from web) or JSON (if using API)
-        // const $ = cheerio.load(html);
+        // Parse HTML with Cheerio
+        const $ = cheerio.load(html);
 
-        // Mock data for example - replace with actual parsing logic
-        const userData = {
-          user_id: Math.floor(Math.random() * 9999999) + 1000000,
+        // Extract JSON data from the __UNIVERSAL_DATA_FOR_REHYDRATION__ script
+        let userData = null;
+        let followerCount = null;
+        let followingCount = null;
+        let likesCount = null;
+        let videoCount = null;
+        let displayName = username;
+        let bio = "";
+        let verified = false;
+        let profileImageUrl = "";
+
+        try {
+          // Find the script tag with JSON data
+          const scriptContent = $(
+            "script#__UNIVERSAL_DATA_FOR_REHYDRATION__"
+          ).html();
+
+          if (scriptContent) {
+            logger.debug("Found __UNIVERSAL_DATA_FOR_REHYDRATION__ script");
+
+            const jsonData = JSON.parse(scriptContent);
+
+            // Navigate through the JSON structure to find webapp.user-detail
+            if (
+              jsonData.__DEFAULT_SCOPE__ &&
+              jsonData.__DEFAULT_SCOPE__["webapp.user-detail"]
+            ) {
+              const userDetail =
+                jsonData.__DEFAULT_SCOPE__["webapp.user-detail"];
+              logger.debug("Found webapp.user-detail section");
+
+              // Extract user info from different possible locations
+              const userInfo = userDetail.userInfo || userDetail.user;
+              console.log("the user info")
+              console.log(userInfo)
+
+              if (userInfo) {
+                // Basic user info
+                displayName =
+                  userInfo.nickname || userInfo.displayName || username;
+                bio = userInfo.signature || userInfo.desc || "";
+                verified = userInfo.verified || false;
+                profileImageUrl =
+                  userInfo.avatarMedium ||
+                  userInfo.avatarLarger ||
+                  userInfo.avatar ||
+                  "";
+
+                // Stats
+                if (userInfo.stats) {
+                  followerCount = userInfo.stats.followerCount || 0;
+                  followingCount = userInfo.stats.followingCount || 0;
+                  likesCount =
+                    userInfo.stats.heartCount || userInfo.stats.diggCount || 0;
+                  videoCount = userInfo.stats.videoCount || 0;
+                }
+
+                logger.info(
+                  `Successfully extracted data for ${username}: ${followerCount} followers`
+                );
+              } else {
+                logger.warn(
+                  `User info not found in expected structure for ${username}`
+                );
+              }
+            } else {
+              logger.warn(`webapp.user-detail not found for ${username}`);
+
+              // Try alternative extraction methods
+              // Sometimes the data might be in different locations
+              if (jsonData.__DEFAULT_SCOPE__) {
+                const sections = Object.keys(jsonData.__DEFAULT_SCOPE__);
+                logger.debug(`Available sections: ${sections.join(", ")}`);
+
+                // Look for user data in other sections
+                for (const section of sections) {
+                  const sectionData = jsonData.__DEFAULT_SCOPE__[section];
+                  if (sectionData && typeof sectionData === "object") {
+                    // Check if this section contains user stats
+                    const possibleUser = this.findUserDataInSection(
+                      sectionData,
+                      username
+                    );
+                    if (possibleUser) {
+                      followerCount = possibleUser.followerCount;
+                      followingCount = possibleUser.followingCount;
+                      likesCount = possibleUser.likesCount;
+                      videoCount = possibleUser.videoCount;
+                      displayName = possibleUser.displayName || displayName;
+                      bio = possibleUser.bio || bio;
+                      verified = possibleUser.verified || verified;
+                      profileImageUrl =
+                        possibleUser.profileImageUrl || profileImageUrl;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            logger.warn(
+              `__UNIVERSAL_DATA_FOR_REHYDRATION__ script not found for ${username}`
+            );
+
+            // Fallback: try to extract basic info from HTML
+            const fallbackData = this.extractFallbackData($, username);
+            if (fallbackData) {
+              displayName = fallbackData.displayName || displayName;
+              bio = fallbackData.bio || bio;
+              verified = fallbackData.verified || verified;
+            }
+          }
+        } catch (parseError) {
+          logger.error(
+            `Error parsing JSON data for ${username}: ${parseError.message}`
+          );
+
+          // Try fallback extraction from HTML
+          const fallbackData = this.extractFallbackData($, username);
+          if (fallbackData) {
+            displayName = fallbackData.displayName || displayName;
+            bio = fallbackData.bio || bio;
+            verified = fallbackData.verified || verified;
+          }
+        }
+
+        // Create user data object with extracted or fallback values
+        userData = {
+          user_id: this.generateUserId(username), // Generate consistent ID based on username
           username: username,
-          display_name: `Display ${username}`,
-          bio: `Bio for ${username}`,
-          follower_count: Math.floor(Math.random() * 100000) + 1000,
-          following_count: Math.floor(Math.random() * 1000) + 100,
-          likes_count: Math.floor(Math.random() * 1000000) + 10000,
-          video_count: Math.floor(Math.random() * 80) + 20,
-          verified: Math.random() > 0.8,
-          private_account: false,
-          profile_image_url: `https://example.com/profile/${username}.jpg`,
+          display_name: displayName,
+          bio: bio,
+          follower_count: followerCount || 0,
+          following_count: followingCount || 0,
+          likes_count: likesCount || 0,
+          video_count: videoCount || 0,
+          verified: verified,
+          private_account: false, // Could be enhanced to detect this
+          profile_image_url: profileImageUrl,
           last_scraped: new Date(),
         };
 
         // Store in database
-        await this.insertUser(userData);
+        // await this.insertUser(userData);
 
-        logger.info(`Successfully scraped user: ${username}`);
+        logger.info(
+          `Successfully scraped user: ${username} (${
+            followerCount || "unknown"
+          } followers)`
+        );
         return userData;
       } catch (error) {
         logger.error(`Failed to scrape user ${username}: ${error.message}`);
         throw error;
       }
     });
+  }
+
+  // Helper method to recursively search for user data in JSON sections
+  findUserDataInSection(sectionData, username) {
+    try {
+      // Convert to string and search for patterns
+      const jsonString = JSON.stringify(sectionData);
+
+      // Look for follower count patterns
+      const followerMatch = jsonString.match(/"followerCount["\s]*:\s*(\d+)/i);
+      const followingMatch = jsonString.match(
+        /"followingCount["\s]*:\s*(\d+)/i
+      );
+      const heartMatch =
+        jsonString.match(/"heartCount["\s]*:\s*(\d+)/i) ||
+        jsonString.match(/"diggCount["\s]*:\s*(\d+)/i);
+      const videoMatch = jsonString.match(/"videoCount["\s]*:\s*(\d+)/i);
+
+      if (followerMatch) {
+        return {
+          followerCount: parseInt(followerMatch[1]),
+          followingCount: followingMatch ? parseInt(followingMatch[1]) : null,
+          likesCount: heartMatch ? parseInt(heartMatch[1]) : null,
+          videoCount: videoMatch ? parseInt(videoMatch[1]) : null,
+        };
+      }
+
+      // Try object traversal approach
+      if (typeof sectionData === "object") {
+        for (const [key, value] of Object.entries(sectionData)) {
+          if (value && typeof value === "object") {
+            if (value.stats || value.followerCount) {
+              const stats = value.stats || value;
+              if (stats.followerCount !== undefined) {
+                return {
+                  followerCount: stats.followerCount,
+                  followingCount: stats.followingCount,
+                  likesCount: stats.heartCount || stats.diggCount,
+                  videoCount: stats.videoCount,
+                  displayName: value.nickname || value.displayName,
+                  bio: value.signature || value.desc,
+                  verified: value.verified,
+                  profileImageUrl:
+                    value.avatarMedium || value.avatarLarger || value.avatar,
+                };
+              }
+            }
+
+            // Recursive search
+            const found = this.findUserDataInSection(value, username);
+            if (found) return found;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors in recursive search
+    }
+
+    return null;
+  }
+
+  // Helper method for fallback HTML extraction
+  extractFallbackData($, username) {
+    try {
+      // Try to extract basic info from meta tags or visible elements
+      const title = $("title").text();
+      let displayName = username;
+      let bio = "";
+      let verified = false;
+
+      // Extract from title if available
+      if (title && title.includes("(@")) {
+        const titleMatch = title.match(/^([^(]+)\s*\(@/);
+        if (titleMatch) {
+          displayName = titleMatch[1].trim();
+        }
+      }
+
+      // Look for verification badge
+      if (
+        $('[data-e2e="profile-icon-verified"]').length > 0 ||
+        $(".tiktok-1mf2e7e-StyledVerifyBadge").length > 0
+      ) {
+        verified = true;
+      }
+
+      // Try to extract bio from meta description
+      const metaDesc = $('meta[name="description"]').attr("content");
+      if (metaDesc) {
+        bio = metaDesc;
+      }
+
+      return { displayName, bio, verified };
+    } catch (e) {
+      logger.debug("Fallback extraction failed:", e.message);
+      return null;
+    }
+  }
+
+  // Helper to generate consistent user ID
+  generateUserId(username) {
+    // Simple hash function to generate consistent numeric ID from username
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+      const char = username.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash) + 1000000; // Ensure positive and add offset
   }
 
   // Scrape video data with anti-detection
