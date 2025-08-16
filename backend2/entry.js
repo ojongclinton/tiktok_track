@@ -36,9 +36,9 @@ class TikTokScraper {
     // Database connection pool
     this.dbPool = mysql.createPool({
       host: process.env.DB_HOST || "localhost",
-      user: process.env.DB_USER || "scraper_user",
-      password: process.env.DB_PASSWORD || "your_password",
-      database: process.env.DB_NAME || "tiktok_scraper",
+      user: process.env.DB_USER || "root",
+      password: process.env.DB_PASSWORD || "",
+      database: process.env.DB_NAME || "ticktok_tracker",
       waitForConnections: true,
       connectionLimit: 20,
       queueLimit: 0,
@@ -142,6 +142,7 @@ class TikTokScraper {
         // Extract and store cookies
         const setCookieHeaders = response.headers["set-cookie"];
         if (setCookieHeaders) {
+          console.log("Set-Cookie Headers:", setCookieHeaders);
           setCookieHeaders.forEach((cookie) => {
             const [nameValue] = cookie.split(";");
             const [name, value] = nameValue.split("=");
@@ -160,6 +161,7 @@ class TikTokScraper {
         return Promise.reject(error);
       }
     );
+
   }
 
   // Generate realistic Sec-Ch-Ua header
@@ -345,6 +347,9 @@ class TikTokScraper {
         let bio = "";
         let verified = false;
         let profileImageUrl = "";
+        let userId = null;
+        let secUid = null;
+        let created_date = null;
 
         try {
           // Find the script tag with JSON data
@@ -368,28 +373,31 @@ class TikTokScraper {
 
               // Extract user info from different possible locations
               const userInfo = userDetail.userInfo || userDetail.user;
-              console.log("the user info")
-              console.log(userInfo)
-
               if (userInfo) {
+                console.log(userInfo.user);
                 // Basic user info
+                userId = userInfo.user.id;
+                secUid = userInfo.user.secUid || userInfo.secUid || "";
                 displayName =
-                  userInfo.nickname || userInfo.displayName || username;
-                bio = userInfo.signature || userInfo.desc || "";
-                verified = userInfo.verified || false;
+                  userInfo.user.nickname || userInfo.displayName || username;
+                created_date = userInfo.user.createTime;
+                bio = userInfo.user.signature || userInfo.user.desc || "";
+                verified = userInfo.user.verified || false;
                 profileImageUrl =
-                  userInfo.avatarMedium ||
-                  userInfo.avatarLarger ||
-                  userInfo.avatar ||
+                  userInfo.user.avatarMedium ||
+                  userInfo.user.avatarLarger ||
+                  userInfo.user.avatar ||
                   "";
 
                 // Stats
-                if (userInfo.stats) {
-                  followerCount = userInfo.stats.followerCount || 0;
-                  followingCount = userInfo.stats.followingCount || 0;
+                if (userInfo.statsV2) {
+                  followerCount = userInfo.statsV2.followerCount || 0;
+                  followingCount = userInfo.statsV2.followingCount || 0;
                   likesCount =
-                    userInfo.stats.heartCount || userInfo.stats.diggCount || 0;
-                  videoCount = userInfo.stats.videoCount || 0;
+                    userInfo.statsV2.heartCount ||
+                    userInfo.statsV2.diggCount ||
+                    0;
+                  videoCount = userInfo.statsV2.videoCount || 0;
                 }
 
                 logger.info(
@@ -436,34 +444,34 @@ class TikTokScraper {
             }
           } else {
             logger.warn(
-              `__UNIVERSAL_DATA_FOR_REHYDRATION__ script not found for ${username}`
+              `@CHECK_THIS_ASAP __UNIVERSAL_DATA_FOR_REHYDRATION__ script not found for ${username}`
             );
 
             // Fallback: try to extract basic info from HTML
-            const fallbackData = this.extractFallbackData($, username);
-            if (fallbackData) {
-              displayName = fallbackData.displayName || displayName;
-              bio = fallbackData.bio || bio;
-              verified = fallbackData.verified || verified;
-            }
+            // const fallbackData = this.extractFallbackData($, username);
+            // if (fallbackData) {
+            //   displayName = fallbackData.displayName || displayName;
+            //   bio = fallbackData.bio || bio;
+            //   verified = fallbackData.verified || verified;
+            // }
           }
         } catch (parseError) {
           logger.error(
-            `Error parsing JSON data for ${username}: ${parseError.message}`
+            `@CHECK_THIS_ASAP Error parsing JSON data for ${username}: ${parseError.message}`
           );
 
           // Try fallback extraction from HTML
-          const fallbackData = this.extractFallbackData($, username);
-          if (fallbackData) {
-            displayName = fallbackData.displayName || displayName;
-            bio = fallbackData.bio || bio;
-            verified = fallbackData.verified || verified;
-          }
+          // const fallbackData = this.extractFallbackData($, username);
+          // if (fallbackData) {
+          //   displayName = fallbackData.displayName || displayName;
+          //   bio = fallbackData.bio || bio;
+          //   verified = fallbackData.verified || verified;
+          // }
         }
 
         // Create user data object with extracted or fallback values
         userData = {
-          user_id: this.generateUserId(username), // Generate consistent ID based on username
+          user_id: userId,
           username: username,
           display_name: displayName,
           bio: bio,
@@ -475,10 +483,14 @@ class TikTokScraper {
           private_account: false, // Could be enhanced to detect this
           profile_image_url: profileImageUrl,
           last_scraped: new Date(),
+          sec_uid: secUid || "",
+          created_date: created_date || "",
         };
 
         // Store in database
-        // await this.insertUser(userData);
+        await this.insertUser(userData);
+        //Check if 2 days have apssed to store analytics data
+        await this.checkAndInsertAnalyticsData(userData);
 
         logger.info(
           `Successfully scraped user: ${username} (${
@@ -688,10 +700,10 @@ class TikTokScraper {
     const connection = await this.dbPool.getConnection();
     try {
       const query = `
-                INSERT INTO users (user_id, username, display_name, bio, follower_count, 
+                INSERT INTO ticktok_users (user_id, username, display_name, bio, follower_count, 
                                  following_count, likes_count, video_count, verified, 
-                                 private_account, profile_image_url, last_scraped)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 private_account, profile_image_url, last_scraped, sec_uid, created_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     follower_count = VALUES(follower_count),
                     following_count = VALUES(following_count),
@@ -713,9 +725,65 @@ class TikTokScraper {
         userData.private_account,
         userData.profile_image_url,
         userData.last_scraped,
+        userData.sec_uid,
+        userData.created_date,
       ];
 
       await connection.execute(query, values);
+    } finally {
+      connection.release();
+    }
+  }
+
+  async checkAndInsertAnalyticsData(userData) {
+    const connection = await this.dbPool.getConnection();
+    try {
+      const checkAnalyticsQuery = `
+      SELECT recorded_at 
+      FROM ticktok_user_analytics 
+      WHERE ticktok_user_id = ? 
+      ORDER BY recorded_at DESC 
+      LIMIT 1
+    `;
+
+      const [analyticsRows] = await connection.execute(checkAnalyticsQuery, [
+        userData.user_id,
+      ]);
+
+      let shouldInsertAnalytics = true;
+
+      if (analyticsRows.length > 0) {
+        const lastRecorded = new Date(analyticsRows[0].recorded_at);
+        const now = new Date();
+        const hoursDifference = (now - lastRecorded) / (1000 * 60 * 60);
+
+        // Only insert if 24 or more hours have passed
+        shouldInsertAnalytics = hoursDifference >= 24;
+      }
+
+      // Insert analytics data if conditions are met
+      if (shouldInsertAnalytics) {
+        const analyticsQuery = `
+        INSERT INTO ticktok_user_analytics (ticktok_user_id, follower_count, following_count, total_likes, video_count)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+
+        const analyticsValues = [
+          userData.user_id,
+          userData.follower_count,
+          userData.following_count,
+          userData.likes_count,
+          userData.video_count,
+        ];
+
+        await connection.execute(analyticsQuery, analyticsValues);
+
+        console.log(`Analytics data inserted for user ${userData.user_id}`);
+      } else {
+        console.log(
+          `Analytics data skipped for user ${userData.user_id} - less than 24 hours since last record`
+        );
+      }
     } finally {
       connection.release();
     }
@@ -885,7 +953,8 @@ async function main() {
 
   try {
     // Sample data for your 100 users × 45 videos scenario
-    const sampleUsernames = ["lovablequeen50", "righttouchfashionacademy"];
+    // const sampleUsernames = ["lovablequeen50", "righttouchfashionacademy"];
+    const sampleUsernames = ["lovablequeen50"];
     const sampleVideoIds = Array.from(
       { length: 4500 },
       (_, i) => `video_${String(i + 1).padStart(5, "0")}`
