@@ -2,12 +2,15 @@
   "name": "tiktok-scraper",
   "version": "1.0.0",
   "description": "Multi-threaded TikTok scraper with engagement analytics",
-  "main": "scraper.js",
+  "main": "app.js",
+  "type": "module",
   "scripts": {
-    "start": "node scraper.js",
-    "dev": "nodemon scraper.js",
-    "test": "node test.js",
-    "install-deps": "npm install"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "status": "node scripts/status.js",
+    "stop": "pkill -f 'node.*app.js'",
+    "worker": "node scripts/single-worker.js",
+    "test-scraper": "node scripts/test-scraper.js"
   },
   "keywords": [
     "tiktok",
@@ -23,8 +26,12 @@
     "dotenv": "^16.3.1",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.2",
+    "ioredis": "^5.7.0",
     "mysql2": "^3.14.3",
     "p-limit": "^3.1.0",
+    "puppeteer": "^24.16.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "winston": "^3.17.0"
   },
   "devDependencies": {
