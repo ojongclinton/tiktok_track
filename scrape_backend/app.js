@@ -1,3 +1,4 @@
+import { writePool } from "./config/database.js";
 import TikTokScrapingOrchestrator from "./TikTokScrapingOrchestrator.js";
 
 // Configuration

@@ -12,7 +12,7 @@ class TikTokScraper {
 
     this.browser = null;
     this.page = null;
-    this.dbPool = options.dbPool || null; // Pass database pool in options
+    this.dbPool = options.dbPool || writePool; // Pass database pool in options
   }
 
   // Utility functions
@@ -719,23 +719,24 @@ class TikTokScraper {
 
 export default TikTokScraper;
 
-// Example usage with database
-import mysql from "mysql2/promise";
+// // Example usage with database
+// import mysql from "mysql2/promise";
+// import { writePool } from "./config/database";
 
-const dbPool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "tiktok_tracker",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+// const dbPool = mysql.createPool({
+//   host: "localhost",
+//   user: "root",
+//   password: "",
+//   database: "tiktok_tracker",
+//   waitForConnections: true,
+//   connectionLimit: 10,
+//   queueLimit: 0,
+// });
 
-const scraper = new TikTokScraper({
-  headless: false,
-  dbPool: dbPool,
-});
+// const scraper = new TikTokScraper({
+//   headless: false,
+//   dbPool: dbPool,
+// });
 
 // Simple test without database
 // const scraper = new TikTokScraper({ headless: false });

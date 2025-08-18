@@ -1,6 +1,7 @@
 import TikTokScraper from './TikTokScraper.js';
 import QueueManager from './QueueManager.js';
 import mysql from 'mysql2/promise';
+import { writePool } from './config/database.js';
 
 class ScraperWorker {
   constructor(workerId, dbConfig, redisConfig = {}) {
@@ -11,16 +12,7 @@ class ScraperWorker {
     this.jobsFailed = 0;
 
     // Database connection
-    this.dbPool = mysql.createPool({
-      host: dbConfig.host || 'localhost',
-      user: dbConfig.user || 'root',
-      password: dbConfig.password || '',
-      database: dbConfig.database,
-      waitForConnections: true,
-      connectionLimit: 5, // Workers need fewer connections
-      queueLimit: 0,
-      ...dbConfig
-    });
+    this.dbPool = writePool
 
     // Queue manager for getting jobs
     this.queueManager = new QueueManager({ redis: redisConfig });
