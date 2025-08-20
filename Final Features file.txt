@@ -1,0 +1,72 @@
+Legend
+******* : section
+// : Comment
+* : Idea
+
+Final Features file
+
+
+Free Tier : Track up to 2 profiles
+Pro Tier $10/month : Track up to 6 profiles (Only tracking with stats)
+Pro + Tier $29/month : Track up to 22 profiles , exports, alerts , compare up to 5 profiles
+Agency: $99/month → everything in pro + ,  100 profiles, team access 
+
+******** Dashboard page (General stats across all accounts) *******
+
+- Add/remove TikTok profiles to track (When removing , have confirmation modal)
+- Current stats display (followers, following, likes, videos) with plus and minus signs [today/yesterday , this_month/last_month , this_week/last_week] 
+- Last updated timestamp
+- Simple profile cards with avatars (With TikTok link)
+
+********* Basic Analytics page (For a single account he selected) *********. Here last 30 days is the default selected time range
+//x the smaller the range , the more in-between data you should show. Videos posted today(between the end and start of today) could show updated stats of each 2.5 hours , videos posted between the start and end of the week
+
+- Follower/Likes/Shares growth chart (last 30 days)
+	From the user analytics, take all the data for last 30 days, have 3 charts (followers, likes and shares). Each point on each chart is the amount of x(followers, likes and shares) he made at the end of that day
+
+- Video performance table (views, likes, shares)
+	* Idea (The smaller the amount of data returned, the more data for a single video you can show)
+	* On the table , have "Previous day" and "Back day" buttons to 
+	* On the page, have the current stats of each video. Then he clicks , opens a popup where he would see how the video has been progressing so far. (Here you can be very detailed showing intervals of every 4 hours or 6 Hours)
+	From the videos analytics , take all the videos user posted in the last 30 days, 
+- Simple engagement rate calculation
+	engagement_rate = (total likes + total comments + total shares) / total followers(average follower count during the period) * 100
+- Growth percentage (daily/weekly)
+	growth_percentage = ((current_period - previous_period) / previous_period) * 100
+
+(Followers) growth_percentage = ((followers_today - followers_yesterday) / followers_yesterday) * 100
+(Likes) growth_percentage = ((likes_this_week - likes_last_week) / likes_last_week) * 100
+(Shares) growth_percentage = ((shares_this_week - shares_last_week) / shares_last_week) * 100
+
+
+- Export profile data to CSV
+- Simple PDF reports
+- Email notifications for major changes (10%+ growth/loss)
+
+
+- Simple sign up/login (Oauth only with google for now)
+- Profile management (Nope)
+- Swap profiles (Free users can swap tracked profiles only once per month, paid plains get to swap up to 10 times per month)
+Tell the free users :
+	“To keep your analytics meaningful and avoid abuse, you can change tracked profiles once per month. Upgrade to Premium for unlimited swaps.”
+
+
+https://chatgpt.com/c/68a48442-1c7c-832e-a2ee-f25bc1070f30
+
+
+REDIS_HOST=redis-18048.c14.us-east-1-3.ec2.redns.redis-cloud.com
+REDIS_PORT=18048
+REDIS_PASSWORD=SShuFKNfb7dD2xGPx9rIXLYzZr1CiTsf
+
+# Auth
+JWT_SECRET=your-super-secret-jwt-key-here
+JWT_EXPIRES_IN=7d
+
+# Server
+PORT=3001
+NODE_ENV=development
+
+# API Limits
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX=100
+
