@@ -1,19 +1,10 @@
-import mysql from 'mysql2/promise';
 import QueueManager from './QueueManager.js';
+import { writePool as dbPool } from './config/database.js';
 
 class ProfileScheduler {
   constructor(profiles, dbConfig, redisConfig = {}) {
     this.profiles = profiles; // Array of usernames to monitor
-    this.dbPool = mysql.createPool({
-      host: dbConfig.host || 'localhost',
-      user: dbConfig.user || 'root',
-      password: dbConfig.password || '',
-      database: dbConfig.database,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      ...dbConfig
-    });
+    this.dbPool = dbPool;
 
     this.queueManager = new QueueManager({ redis: redisConfig });
     this.isRunning = false;
