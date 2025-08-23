@@ -1,31 +1,16 @@
-import express from 'express';
-import { body } from 'express-validator';
-import { validate } from '../middleware/validation.js';
-import { authenticate } from '../middleware/auth.js';
-import rateLimit from 'express-rate-limit';
+import express from "express";
+import { body } from "express-validator";
+import { validate } from "../middleware/validation.js";
+import { authenticate } from "../middleware/auth.js";
+import rateLimit from "express-rate-limit";
 import {
   register,
-  login,
-  refreshToken,
   logout,
-  logoutAll,
   me,
-  verifyEmail,
-  resendVerification,
-  forgotPassword,
-  resetPassword
-} from '../controllers/authController.js';
+} from "../controllers/authController.js";
 
 const router = express.Router();
 
-// Rate limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
-  message: { success: false, message: 'Too many authentication attempts, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -34,119 +19,22 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Validation rules
-const registerValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
-  body('firstName')
-    .optional()
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('First name must be between 1 and 100 characters'),
-  body('lastName')
-    .optional()
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Last name must be between 1 and 100 characters')
-];
 
-const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
-];
 
-const refreshTokenValidation = [
-  body('refreshToken')
-    .notEmpty()
-    .withMessage('Refresh token is required')
-];
+router.post("/register", register);
 
-const emailValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email')
-];
+router.post("/logout",authenticate, logout);
 
-const passwordValidation = [
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-];
+router.get("/me", authenticate, me);
 
-// Routes
-router.post('/register', 
-  authLimiter, 
-  registerValidation, 
-  validate, 
-  register
-);
 
-router.post('/login', 
-  authLimiter, 
-  loginValidation, 
-  validate, 
-  login
-);
-
-router.post('/refresh-token', 
-  generalLimiter, 
-  refreshTokenValidation, 
-  validate, 
-  refreshToken
-);
-
-router.post('/logout', 
-  generalLimiter, 
-  logout
-);
-
-router.post('/logout-all', 
-  generalLimiter, 
-  authenticate, 
-  logoutAll
-);
-
-router.get('/me', 
-  generalLimiter, 
-  authenticate, 
-  me
-);
-
-router.get('/verify-email/:token', 
-  generalLimiter, 
-  verifyEmail
-);
-
-router.post('/resend-verification', 
-  authLimiter, 
-  emailValidation, 
-  validate, 
-  resendVerification
-);
-
-router.post('/forgot-password', 
-  authLimiter, 
-  emailValidation, 
-  validate, 
-  forgotPassword
-);
-
-router.post('/reset-password/:token', 
-  authLimiter, 
-  passwordValidation, 
-  validate, 
-  resetPassword
-);
+router.get("/testAuth", generalLimiter, authenticate, (req, res) => {
+  res.json({
+    success: true,
+    message: "TikTok Analytics API is running",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0",
+  });
+});
 
 export default router;

@@ -1,5 +1,6 @@
 import express from 'express';
 import authRoutes from './auth.js';
+import profileRoutes from './tiktokProfiles.js';
 // import profileRoutes from './profiles.js';
 // import analyticsRoutes from './analytics.js';
 // import exportRoutes from './export.js';
@@ -16,8 +17,18 @@ router.get('/health', (req, res) => {
   });
 });
 
+router.get('/testAuth', (req, res) => {
+  res.json({
+    success: true,
+    message: 'TikTok Analytics API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
 // Mount route modules
 router.use('/auth', authRoutes);
+router.use('/profiles', profileRoutes);
 // router.use('/profiles', profileRoutes);
 // router.use('/analytics', analyticsRoutes);
 // router.use('/export', exportRoutes);

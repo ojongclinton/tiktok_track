@@ -19,22 +19,6 @@ CREATE TABLE `users` (
   KEY `idx_subscription` (`subscription_plan`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Refresh tokens table
-CREATE TABLE `refresh_tokens` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` int(11) NOT NULL,
-  `token` varchar(255) NOT NULL UNIQUE,
-  `expires_at` datetime NOT NULL,
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `revoked_at` datetime DEFAULT NULL,
-  `device_info` json DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_token` (`token`),
-  KEY `idx_expires` (`expires_at`),
-  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- User tracked profiles (many-to-many)
 CREATE TABLE `user_tracked_profiles` (

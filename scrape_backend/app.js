@@ -72,9 +72,6 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-// Start the system
-// if (import.meta.url === `file://${process.argv[1]}`) {
 main();
-// }
 
 export default main;

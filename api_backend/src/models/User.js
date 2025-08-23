@@ -19,7 +19,7 @@ const User = sequelize.define('User', {
   },
   password: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     validate: {
       len: [6, 255]
     }
@@ -59,6 +59,10 @@ const User = sequelize.define('User', {
   password_reset_expires: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  appwrite_user_id: {
+    type: DataTypes.STRING,
+    allowNull: false
   }
 }, {
   tableName: 'users',
