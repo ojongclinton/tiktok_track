@@ -1,6 +1,12 @@
 // import TikTokUser from "../models/TikTokUser.js";
 // import UserTrackedProfile from "../models/UserTrackedProfile.js";
-import { UserTrackedProfile, TikTokUser } from "../models/index.js";
+import { Op } from "sequelize";
+import {
+  UserTrackedProfile,
+  TikTokUser,
+  TikTokUserAnalysis,
+  sequelize,
+} from "../models/index.js";
 import { addProfileToQueue } from "../redis/redisUtils.js";
 import {
   fetchAnduploadProfileImageToAppWrite,
@@ -137,43 +143,204 @@ export const removeUserTrackedProfile = async (req, res) => {
 };
 
 //THis route would return only the 2 last profile analysis data per profile
+// export const getUserTrackedProfiles = async (req, res) => {
+//   // Implementation for retrieving all tracked profiles for the user
+//   const connectedUser = req.user;
+//   let connectedUserId = await getUserIdByAppWriteId(connectedUser.id);
+//   if (!connectedUserId) {
+//     return res.status(404).json({ error: "User not found" });
+//   }
+//   const trackedProfiles = await UserTrackedProfile.findAll({
+//     where: { user_id: connectedUserId, is_active: true },
+//     include: [
+//       {
+//         model: TikTokUser,
+//         as: "profile",
+//       },
+//     ],
+//   });
+
+// const response = await Promise.all(
+//   trackedProfiles.map(async (tracking) => {
+//     const profile = tracking.profile;
+//     if (!profile) return null;
+
+//     // latest analysis row
+//     const analysis = await TikTokUserAnalysis.findOne({
+//       where: { ticktok_user_id: profile.user_id },
+//       order: [["recorded_at", "DESC"]],
+//     });
+
+//     return {
+//       user_id: profile.user_id,
+//       username: profile.username,
+//       display_name: profile.display_name,
+//       followers_count: profile.follower_count,
+//       following_count: profile.following_count,
+//       likes_count: profile.likes_count,
+//       video_count: profile.video_count,
+//       verified: profile.verified,
+//       private_account: profile.private_account,
+//       profile_image_url: profile.profile_image_url,
+//       last_scraped: profile.last_scraped,
+//       sec_uid: profile.sec_uid,
+//       created_date: profile.created_date,
+
+//       // new field
+//       analysis: analysis
+//         ? {
+//             follower_count: analysis.follower_count,
+//             following_count: analysis.following_count,
+//             total_likes: analysis.total_likes,
+//             video_count: analysis.video_count,
+//             recorded_at: analysis.recorded_at,
+//           }
+//         : null,
+//     };
+//   })
+// );
+
+// return res.status(200).json({ trackedProfiles: response.filter(Boolean) });
+// };
+
 export const getUserTrackedProfiles = async (req, res) => {
-  // Implementation for retrieving all tracked profiles for the user
-  const connectedUser = req.user;
-  let connectedUserId = await getUserIdByAppWriteId(connectedUser.id);
-  if (!connectedUserId) {
-    return res.status(404).json({ error: "User not found" });
-  }
-  const trackedProfiles = await UserTrackedProfile.findAll({
-    where: { user_id: connectedUserId, is_active: true },
-    include: [
-      {
-        model: TikTokUser,
-        as: "profile",
+  try {
+    const connectedUser = req.user;
+    const {
+      page = 1,
+      limit = 20,
+      search = "",
+      sortBy = "username",
+      sortOrder = "ASC",
+    } = req.query;
+
+    // Get user ID once
+    const connectedUserId = await getUserIdByAppWriteId(connectedUser.id);
+    if (!connectedUserId) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Build search condition
+    const searchCondition = search
+      ? {
+          [Op.or]: [
+            { "$profile.username$": { [Op.iLike]: `%${search}%` } },
+            { "$profile.display_name$": { [Op.iLike]: `%${search}%` } },
+          ],
+        }
+      : {};
+
+    // Calculate offset for pagination
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Step 1: Get tracked profiles with basic info
+    const { rows: trackedProfiles, count: totalCount } =
+      await UserTrackedProfile.findAndCountAll({
+        where: {
+          user_id: connectedUserId,
+          is_active: true,
+          ...searchCondition,
+        },
+        include: [
+          {
+            model: TikTokUser,
+            as: "profile",
+            required: true, // INNER JOIN to exclude null profiles
+          },
+        ],
+        order: [[{ model: TikTokUser, as: "profile" }, sortBy, sortOrder]],
+        limit: parseInt(limit),
+        offset: offset,
+        distinct: true,
+      });
+
+    // Step 2: Get latest analysis for each profile in a single optimized query
+    const profileIds = trackedProfiles.map((tp) => tp.profile.user_id);
+
+    let latestAnalyses = [];
+    if (profileIds.length > 0) {
+      latestAnalyses = await sequelize.query(
+        `
+        SELECT a1.*
+        FROM ticktok_user_analytics a1
+        INNER JOIN (
+          SELECT ticktok_user_id, MAX(recorded_at) as max_recorded_at
+          FROM ticktok_user_analytics
+          WHERE ticktok_user_id IN (:profileIds)
+          GROUP BY ticktok_user_id
+        ) a2 ON a1.ticktok_user_id = a2.ticktok_user_id 
+        AND a1.recorded_at = a2.max_recorded_at
+      `,
+        {
+          replacements: { profileIds },
+          type: sequelize.QueryTypes.SELECT,
+        }
+      );
+    }
+
+    // Create a map for quick lookup
+    const analysisMap = latestAnalyses.reduce((map, analysis) => {
+      map[analysis.ticktok_user_id] = analysis;
+      return map;
+    }, {});
+
+    // Step 3: Transform the results using the analysis map
+    const response = trackedProfiles.map((tracking) => {
+      const profile = tracking.profile;
+      const latestAnalysis = analysisMap[profile.user_id] || null;
+
+      return {
+        user_id: profile.user_id,
+        username: profile.username,
+        display_name: profile.display_name,
+        followers_count: profile.follower_count,
+        previous_followers_count: latestAnalysis.follower_count
+          ? latestAnalysis.follower_count
+          : profile.follower_count,
+        following_count: profile.following_count,
+        previous_following_count: latestAnalysis.following_count
+          ? latestAnalysis.following_count
+          : profile.following_count,
+        likes_count: profile.likes_count,
+        previous_likes_count: latestAnalysis.total_likes
+          ? latestAnalysis.total_likes
+          : profile.likes_count,
+        video_count: profile.video_count,
+        previous_video_count: latestAnalysis.video_count
+          ? latestAnalysis.video_count
+          : profile.video_count,
+        verified: profile.verified,
+        private_account: profile.private_account,
+        profile_image_url: profile.profile_image_url,
+        last_scraped: profile.last_scraped,
+        sec_uid: profile.sec_uid,
+        created_date: profile.created_date,
+        // analysis: latestAnalysis
+        //   ? {
+        //       follower_count: latestAnalysis.follower_count,
+        //       following_count: latestAnalysis.following_count,
+        //       total_likes: latestAnalysis.total_likes,
+        //       video_count: latestAnalysis.video_count,
+        //       recorded_at: latestAnalysis.recorded_at,
+        //     }
+        //   : null,
+      };
+    });
+
+    return res.status(200).json({
+      trackedProfiles: response,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        totalCount: totalCount,
+        hasNextPage: offset + response.length < totalCount,
+        hasPrevPage: parseInt(page) > 1,
       },
-    ],
-  });
-
-  const response = trackedProfiles.map((tracking) => {
-    const profile = tracking.profile;
-    return {
-      user_id: profile.user_id,
-      username: profile.username,
-      display_name: profile.display_name,
-      followers_count: profile.follower_count,
-      following_count: profile.following_count,
-      likes_count: profile.likes_count,
-      video_count: profile.video_count,
-      verified: profile.verified,
-      private_account: profile.private_account,
-      profile_image_url: profile.profile_image_url,
-      last_scraped: profile.last_scraped,
-      sec_uid: profile.sec_uid,
-      created_date: profile.created_date,
-    };
-  });
-
-  return res.status(200).json({ trackedProfiles: response });
+    });
+  } catch (error) {
+    console.error("Error fetching tracked profiles:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 //Previous values for each metric would come from the latest analytics data of that tracked profile.

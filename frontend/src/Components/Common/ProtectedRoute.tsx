@@ -21,10 +21,7 @@ import {
   UsersIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import {
-  ChevronDownIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/20/solid";
+import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { classNames } from "../../utils/helpers";
 import { Outlet, useLocation, Link, useNavigate } from "react-router";
 import companyLogo from "../../assets/logo-transparent-svg.svg";
@@ -32,6 +29,7 @@ import { useApiLogoutUser } from "../../api/ProfilesApi";
 import { useDispatch } from "react-redux";
 import { useGetJwt, useGetUser } from "../../appwrite/auth/AuthApi";
 import { login } from "../../slices/authSlice";
+import AppSkeletonLoadingEnhanced from "./AppSkeleton";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
@@ -65,7 +63,7 @@ const userNavigation = [
 
 export default function Example() {
   const [appLoading, setAppLoading] = useState(true);
-  const { isLoggedOut, isLoading, logoutUser } = useApiLogoutUser();
+  const { logoutUser } = useApiLogoutUser();
   const dispatch = useDispatch();
 
   const { getUser } = useGetUser();
@@ -95,11 +93,10 @@ export default function Example() {
   }, []);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
 
   // Function to check if a route is active
-  const isActiveRoute = (href) => {
+  const isActiveRoute = (href: string) => {
     if (href === "/dashboard") {
       return location.pathname === "/dashboard";
     }
@@ -107,7 +104,13 @@ export default function Example() {
   };
 
   // Function to handle navigation item click
-  const handleNavClick = (item, e) => {
+  const handleNavClick = (
+    item: {
+      comingSoon?: boolean;
+      tooltip: string;
+    },
+    e
+  ) => {
     if (item.comingSoon) {
       e.preventDefault();
       alert(item.tooltip || "Coming soon!");
@@ -117,12 +120,31 @@ export default function Example() {
   };
 
   // Render navigation item
-  const renderNavItem = (item, isMobile = false) => {
+  interface NavItem {
+    name: string;
+    href: string;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    comingSoon?: boolean;
+    tooltip?: string;
+  }
+
+  const renderNavItem = (
+    item: NavItem,
+    isMobile: boolean = false
+  ): React.ReactElement => {
     const isActive = isActiveRoute(item.href);
-    const ItemComponent = item.comingSoon ? "button" : Link;
+    const ItemComponent: React.ElementType = item.comingSoon ? "button" : Link;
     const itemProps = item.comingSoon
-      ? { type: "button", onClick: (e) => handleNavClick(item, e) }
-      : { to: item.href, onClick: (e) => handleNavClick(item, e) };
+      ? {
+          type: "button",
+          onClick: (e: React.MouseEvent<HTMLButtonElement>) =>
+            handleNavClick(item, e),
+        }
+      : {
+          to: item.href,
+          onClick: (e: React.MouseEvent<HTMLAnchorElement>) =>
+            handleNavClick(item, e),
+        };
 
     return (
       <ItemComponent
@@ -277,6 +299,12 @@ export default function Example() {
     </div>
   );
 
+  if (appLoading) {
+    return (
+      <AppSkeletonLoadingEnhanced />
+    );
+  }
+
   return (
     <>
       <div>
@@ -320,7 +348,7 @@ export default function Example() {
 
         {/* Desktop sidebar */}
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-          <div className="flex grow flex-col gap-y-5  border-r border-gray-100 bg-white/95 backdrop-blur-xl shadow-xl">
+          <div className="flex grow flex-col gap-y-5  border-r border-gray-100 bg-white/95 backdrop-blur-xl shadow-md">
             <SidebarContent />
           </div>
         </div>
@@ -328,7 +356,7 @@ export default function Example() {
         <div className="lg:pl-72">
           {/* Enhanced top navigation */}
           <div className="sticky top-0 z-40">
-            <div className="flex h-16 items-center gap-x-4 border-b border-gray-100 bg-white/80 backdrop-blur-xl px-4 shadow-lg sm:gap-x-6 sm:px-6 lg:px-8">
+            <div className="flex h-16 items-center gap-x-4 border-b border-gray-100 bg-white/80 backdrop-blur-xl px-4 sm:gap-x-6 sm:px-6 lg:px-8">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
@@ -423,8 +451,8 @@ export default function Example() {
             </div>
           </div>
 
-          <main className="py-8 lg:py-10">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <main className="py-8 lg:py-10 bg-gray-50">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ">
               <Outlet />
             </div>
           </main>

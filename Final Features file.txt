@@ -13,10 +13,10 @@ Agency: $99/month → everything in pro + ,  100 profiles, team access
 
 ******** Dashboard page (General stats across all accounts) *******
 
-- Add/remove TikTok profiles to track (When removing , have confirmation modal)
-- Current stats display (followers, following, likes, videos) with plus and minus signs [today/yesterday , this_month/last_month , this_week/last_week] 
-- Last updated timestamp
-- Simple profile cards with avatars (With TikTok link)
+- Add/remove TikTok profiles to track (When removing , have confirmation modal) [x]
+- Current stats display (followers, following, likes, videos) with plus and minus signs [today/yesterday , this_month/last_month , this_week/last_week] [x]
+- Last updated timestamp [x]
+- Simple profile cards with avatars (With TikTok link) [x]
 
 ********* Basic Analytics page (For a single account he selected) *********. Here last 30 days is the default selected time range
 //x the smaller the range , the more in-between data you should show. Videos posted today(between the end and start of today) could show updated stats of each 2.5 hours , videos posted between the start and end of the week
@@ -42,6 +42,7 @@ Agency: $99/month → everything in pro + ,  100 profiles, team access
 - Export profile data to CSV
 - Simple PDF reports
 - Email notifications for major changes (10%+ growth/loss)
+- possibility of making your profile public (so as to allow visitors to come and see, like, etc : Main goal is to showcase your profile)
 
 
 - Simple sign up/login (Oauth only with google for now)
@@ -55,3 +56,5 @@ https://chatgpt.com/c/68a48442-1c7c-832e-a2ee-f25bc1070f30
 
 
 
+
+- on first scrape of a profile, email the user letting him know his data is ready

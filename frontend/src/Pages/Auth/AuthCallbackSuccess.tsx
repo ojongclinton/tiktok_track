@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router";
 import { login, logout } from "../../slices/authSlice";
@@ -10,7 +10,7 @@ import { useRegisterUserToSystem } from "../../api/ProfilesApi";
 function AuthCallbackSuccess() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isRegistered, isLoading, registerUser } = useRegisterUserToSystem();
+  const { registerUser } = useRegisterUserToSystem();
 
   const { getUser } = useGetUser();
   const { getJwt } = useGetJwt();

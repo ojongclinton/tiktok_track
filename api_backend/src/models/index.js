@@ -33,15 +33,30 @@ UserTrackedProfile.belongsTo(TikTokUser, {
   as: "profile",
 });
 
+// TikTokUserAnalysis.belongsTo(TikTokUser, {
+//   foreignKey: "ticktok_user_id",
+//   as: "profile",
+// });
+
+// TikTokUser.hasMany(TikTokUserAnalysis, {
+//   foreignKey: "user_id",
+//   as: "profile",
+// });
+
+// Each analysis record belongs to one TikTokUser
 TikTokUserAnalysis.belongsTo(TikTokUser, {
-  foreignKey: "ticktok_user_id",
-  as: "profile",
+  foreignKey: "ticktok_user_id",  // column in TikTokUserAnalysis
+  targetKey: "user_id",           // column in TikTokUser
+  as: "profile",                  // alias for the join
 });
 
+// A TikTokUser has many analyses
 TikTokUser.hasMany(TikTokUserAnalysis, {
-  foreignKey: "user_id",
-  as: "profile",
+  foreignKey: "ticktok_user_id",  // column in TikTokUserAnalysis
+  sourceKey: "user_id",           // column in TikTokUser
+  as: "analyses",                 // alias for the list
 });
+
 
 const models = {
   TikTokUser,
