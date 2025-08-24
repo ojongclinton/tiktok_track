@@ -30,7 +30,7 @@ export const authenticate = async (req, res, next) => {
     if (cachedUser) {
       console.log("Found user in cache !!!")
       console.log(cachedUser)
-      req.user = cachedUser;
+      req.user = {...cachedUser,id: cachedUser.$id};
       return next();
     }
 
@@ -42,7 +42,7 @@ export const authenticate = async (req, res, next) => {
     // Cache the result
     tokenCache.set(token, user);
 
-    req.user = user;
+    req.user = {...user,id: user.$id};
     next();
   } catch (err) {
     console.error("Authentication failed:", err);

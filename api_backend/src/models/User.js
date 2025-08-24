@@ -80,6 +80,14 @@ const User = sequelize.define('User', {
   }
 });
 
+//Has many relationship with UserTrackedProfile
+User.associate = (models) => {
+  User.hasMany(models.UserTrackedProfile, {
+    foreignKey: 'user_id',
+    as: 'trackedProfiles'
+  });
+}
+
 // Instance methods
 User.prototype.checkPassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);

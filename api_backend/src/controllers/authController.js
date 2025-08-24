@@ -7,8 +7,6 @@ const tokenCache = new NodeCache({ stdTTL: 300 });
 export const register = async (req, res) => {
   try {
     const { oauth2User } = req.body;
-    console.log("THIS IS THE USER THAT ARRIVED ", oauth2User);
-
     // Find user
     const user = await User.findOne({ where: { email: oauth2User.email } });
     if (user) {
@@ -128,10 +126,12 @@ export const getTikTokUserStats = async (req, res) => {
     }
 
     const html = await response.text();
-
     // Helper to extract JSON object after a key
     const extractJSON = (key) => {
-      const regex = new RegExp(`"${key}"\\s*:\\s*(\\{.*?\\})(?=,\\s*"\\w+")`, "s");
+      const regex = new RegExp(
+        `"${key}"\\s*:\\s*(\\{.*?\\})(?=,\\s*"\\w+")`,
+        "s"
+      );
       const match = html.match(regex);
       if (!match) return null;
       try {
@@ -144,6 +144,14 @@ export const getTikTokUserStats = async (req, res) => {
     const stats = extractJSON("stats");
     const statsV2 = extractJSON("statsV2");
     const shareMeta = extractJSON("shareMeta");
+    let userMeta = {
+      id: null,
+      secUid: null,
+      displayName: null,
+      uniqueId: null,
+      verified: null,
+      createTime: null,
+    };
 
     // Extract avatar URLs directly
     const extractAvatar = (key) => {
@@ -159,17 +167,33 @@ export const getTikTokUserStats = async (req, res) => {
       avatarThumb: extractAvatar("avatarThumb"),
     };
 
+    const match = html.match(/"webapp\.user-detail":({.*?})\s*,"webapp\.a-b"/s);
+    if (match) {
+      const userDetailJson = match[1];
+      const userDetail = JSON.parse(userDetailJson);
+      if (userDetail.userInfo.user) {
+        userMeta = {
+          id: userDetail.userInfo.user.id,
+          secUid: userDetail.userInfo.user.secUid,
+          displayName: userDetail.userInfo.user.nickname,
+          uniqueId: userDetail.userInfo.user.uniqueId,
+          verified: userDetail.userInfo.user.verified,
+          createTime: userDetail.userInfo.user.createTime,
+        };
+      }
+    }
+
     const finalData = {
       stats,
       statsV2,
       shareMeta,
       avatars,
+      userMeta,
     };
-      //TODO : When saving the user on the frontend, you can download and send file to appWrite
+    //TODO : When saving the user on the frontend, you can download and send file to appWrite
     sendSuccess(res, finalData, "TikTok stats fetched successfully");
   } catch (err) {
     console.error("Error fetching TikTok stats:", err);
     sendError(res, "Failed to fetch TikTok stats.");
   }
 };
-
