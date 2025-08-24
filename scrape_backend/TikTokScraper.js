@@ -43,11 +43,11 @@ class TikTokScraper {
       videos: [],
       musics: [], // Add music collection
       tags: [], // Add tags collection
-      shouldStopScrolling: false
+      shouldStopScrolling: false,
     };
 
     // Calculate 3 months ago timestamp (in milliseconds)
-    const threeMonthsAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const threeMonthsAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
     this.page.on("response", async (response) => {
       const url = response.url();
@@ -66,7 +66,40 @@ class TikTokScraper {
         }
 
         // Intercept video API responses
-        if (url.includes('/api/post/item_list/') && status === 200) {
+        //Commented this code to try fixing the bug of first page not inserting if cursor is directly more than 3 months old
+        // if (url.includes('/api/post/item_list/') && status === 200) {
+        //   console.log("📹 Intercepted video API response");
+        //   const responseText = await response.text();
+        //   const videoData = JSON.parse(responseText);
+
+        //   // Check cursor timestamp (convert to milliseconds if needed)
+        //   let cursorTimestamp = parseInt(videoData.cursor);
+        //   if (cursorTimestamp.toString().length === 10) {
+        //     cursorTimestamp *= 1000; // Convert from seconds to milliseconds
+        //   }
+
+        //   console.log(`   Cursor timestamp: ${cursorTimestamp}`);
+        //   console.log(`   Cursor date: ${new Date(cursorTimestamp).toISOString()}`);
+        //   console.log(`   Videos in batch: ${videoData.itemList?.length || 0}`);
+        //   console.log(`   Has more: ${videoData.hasMore}`);
+
+        //   // Check if we should stop scrolling
+        //   if (cursorTimestamp < threeMonthsAgo) {
+        //     console.log(`🛑 Cursor is older than 3 months, stopping scrolling`);
+        //     this.capturedData.shouldStopScrolling = true;
+        //   } else if (!videoData.hasMore) {
+        //     console.log(`🛑 No more videos available, stopping scrolling`);
+        //     this.capturedData.shouldStopScrolling = true;
+        //   } else {
+        //     // Process videos in this batch
+        //     if (videoData.itemList && videoData.itemList.length > 0) {
+        //       const processedVideos = this.processVideoBatch(videoData.itemList, username);
+        //       this.capturedData.videos.push(...processedVideos);
+        //       console.log(`✅ Processed ${processedVideos.length} videos`);
+        //     }
+        //   }
+        // }
+        if (url.includes("/api/post/item_list/") && status === 200) {
           console.log("📹 Intercepted video API response");
           const responseText = await response.text();
           const videoData = JSON.parse(responseText);
@@ -78,27 +111,31 @@ class TikTokScraper {
           }
 
           console.log(`   Cursor timestamp: ${cursorTimestamp}`);
-          console.log(`   Cursor date: ${new Date(cursorTimestamp).toISOString()}`);
+          console.log(
+            `   Cursor date: ${new Date(cursorTimestamp).toISOString()}`
+          );
           console.log(`   Videos in batch: ${videoData.itemList?.length || 0}`);
           console.log(`   Has more: ${videoData.hasMore}`);
 
-          // Check if we should stop scrolling
+          // ALWAYS process videos first if they exist
+          if (videoData.itemList && videoData.itemList.length > 0) {
+            const processedVideos = this.processVideoBatch(
+              videoData.itemList,
+              username
+            );
+            this.capturedData.videos.push(...processedVideos);
+            console.log(`✅ Processed ${processedVideos.length} videos`);
+          }
+
+          // THEN check if we should stop scrolling
           if (cursorTimestamp < threeMonthsAgo) {
             console.log(`🛑 Cursor is older than 3 months, stopping scrolling`);
             this.capturedData.shouldStopScrolling = true;
           } else if (!videoData.hasMore) {
             console.log(`🛑 No more videos available, stopping scrolling`);
             this.capturedData.shouldStopScrolling = true;
-          } else {
-            // Process videos in this batch
-            if (videoData.itemList && videoData.itemList.length > 0) {
-              const processedVideos = this.processVideoBatch(videoData.itemList, username);
-              this.capturedData.videos.push(...processedVideos);
-              console.log(`✅ Processed ${processedVideos.length} videos`);
-            }
           }
         }
-
       } catch (error) {
         console.error("❌ Error processing response:", error.message);
       }
@@ -117,17 +154,17 @@ class TikTokScraper {
         if (video.music && video.music.id) {
           const musicData = {
             music_id: video.music.id,
-            title: video.music.title || 'Unknown',
-            artist: video.music.authorName || 'Unknown Artist',
+            title: video.music.title || "Unknown",
+            artist: video.music.authorName || "Unknown Artist",
             duration_ms: (video.music.duration || 0) * 1000, // Convert to milliseconds
             original_sound: video.music.original || false,
             usage_count: 1, // We'll increment this in the upsert
             trending_score: 0.0, // You can calculate this later based on usage
-            created_at: new Date()
+            created_at: new Date(),
           };
 
           // Check if we haven't already processed this music in this batch
-          if (!processedMusics.find(m => m.music_id === musicData.music_id)) {
+          if (!processedMusics.find((m) => m.music_id === musicData.music_id)) {
             processedMusics.push(musicData);
           }
         }
@@ -139,12 +176,12 @@ class TikTokScraper {
             if (challenge.id) {
               const tagData = {
                 id: challenge.id,
-                name: challenge.title || '',
-                desc: challenge.desc || ''
+                name: challenge.title || "",
+                desc: challenge.desc || "",
               };
 
               // Add to processed tags if not already there
-              if (!processedTags.find(t => t.id === tagData.id)) {
+              if (!processedTags.find((t) => t.id === tagData.id)) {
                 processedTags.push(tagData);
               }
 
@@ -158,23 +195,22 @@ class TikTokScraper {
         const videoData = {
           video_id: video.id,
           ticktok_user_id: video.author?.id,
-          description: video.desc || '',
+          description: video.desc || "",
           view_count: parseInt(video.stats?.playCount) || 0,
           like_count: parseInt(video.stats?.diggCount) || 0,
           comment_count: parseInt(video.stats?.commentCount) || 0,
           share_count: parseInt(video.stats?.shareCount) || 0,
           duration_ms: (video.video?.duration || 0) * 1000, // Convert seconds to milliseconds
-          video_url: video.video?.playAddr || '',
-          cover_image_url: video.video?.cover || '',
+          video_url: video.video?.playAddr || "",
+          cover_image_url: video.video?.cover || "",
           music_id: video.music?.id || null,
           tags: JSON.stringify(videoTagIds), // Store tag IDs as JSON array
           created_at: new Date(video.createTime * 1000), // Convert to JS Date
           scraped_at: new Date(),
-          updated_at: new Date()
+          updated_at: new Date(),
         };
 
         processedVideos.push(videoData);
-
       } catch (error) {
         console.error(`❌ Error processing video ${video.id}:`, error.message);
       }
@@ -183,7 +219,7 @@ class TikTokScraper {
     // Store music and tags data for insertion
     this.capturedData.musics = this.capturedData.musics || [];
     this.capturedData.musics.push(...processedMusics);
-    
+
     this.capturedData.tags = this.capturedData.tags || [];
     this.capturedData.tags.push(...processedTags);
 
@@ -206,15 +242,10 @@ class TikTokScraper {
             description = VALUES(description)
       `;
 
-      const values = [
-        tagData.id,
-        tagData.name,
-        tagData.desc
-      ];
+      const values = [tagData.id, tagData.name, tagData.desc];
 
       await connection.execute(query, values);
       return true;
-
     } catch (error) {
       console.error(`❌ Error inserting tag ${tagData.id}:`, error.message);
       return false;
@@ -246,14 +277,16 @@ class TikTokScraper {
         musicData.original_sound,
         musicData.usage_count,
         musicData.trending_score,
-        musicData.created_at
+        musicData.created_at,
       ];
 
       await connection.execute(query, values);
       return true;
-
     } catch (error) {
-      console.error(`❌ Error inserting music ${musicData.music_id}:`, error.message);
+      console.error(
+        `❌ Error inserting music ${musicData.music_id}:`,
+        error.message
+      );
       return false;
     } finally {
       connection.release();
@@ -343,15 +376,15 @@ class TikTokScraper {
     while (!this.capturedData.shouldStopScrolling && scrollCount < maxScrolls) {
       scrollCount++;
       console.log(`   Scroll ${scrollCount} - collecting videos...`);
-      
+
       // Perform scroll
       await this.page.evaluate(() => {
         window.scrollBy(0, 800);
       });
-      
+
       // Wait for API response
       await this.randomDelay(2000, 4000);
-      
+
       // Check if we should stop
       if (this.capturedData.shouldStopScrolling) {
         console.log(`🛑 Stopping at scroll ${scrollCount} due to time limit`);
@@ -364,8 +397,10 @@ class TikTokScraper {
     }
 
     console.log(`✅ Video collection completed after ${scrollCount} scrolls`);
-    console.log(`📊 Total videos collected: ${this.capturedData.videos.length}`);
-    
+    console.log(
+      `📊 Total videos collected: ${this.capturedData.videos.length}`
+    );
+
     return this.capturedData.videos;
   }
 
@@ -438,7 +473,7 @@ class TikTokScraper {
             video.tags, // JSON string of tag IDs
             video.created_at,
             video.scraped_at,
-            video.updated_at
+            video.updated_at,
           ];
 
           const result = await connection.execute(query, values);
@@ -446,13 +481,17 @@ class TikTokScraper {
             insertedCount++;
           }
         } catch (videoError) {
-          console.error(`❌ Error inserting video ${video.video_id}:`, videoError.message);
+          console.error(
+            `❌ Error inserting video ${video.video_id}:`,
+            videoError.message
+          );
         }
       }
 
-      console.log(`✅ Successfully inserted ${insertedCount}/${videos.length} new videos`);
+      console.log(
+        `✅ Successfully inserted ${insertedCount}/${videos.length} new videos`
+      );
       return true;
-
     } catch (error) {
       console.error("❌ Database video insert error:", error.message);
       return false;
@@ -474,22 +513,26 @@ class TikTokScraper {
       const checkQuery = `
         SELECT va.video_id, MAX(va.recorded_at) as last_recorded
         FROM tiktok_videos_analytics va
-        WHERE va.video_id IN (${videos.map(() => '?').join(',')})
+        WHERE va.video_id IN (${videos.map(() => "?").join(",")})
         GROUP BY va.video_id
         HAVING MAX(va.recorded_at) < NOW() - INTERVAL 2 HOUR
       `;
 
-      const videoIds = videos.map(v => v.video_id);
+      const videoIds = videos.map((v) => v.video_id);
       const [existingRecords] = await connection.execute(checkQuery, videoIds);
-      
+
       // Get video IDs that either don't have analytics or last record is 2+ hours old
-      const needAnalytics = videos.filter(video => {
-        const hasRecentRecord = existingRecords.some(record => record.video_id === video.video_id);
+      const needAnalytics = videos.filter((video) => {
+        const hasRecentRecord = existingRecords.some(
+          (record) => record.video_id === video.video_id
+        );
         return !hasRecentRecord; // Insert if no recent record found
       });
 
       if (needAnalytics.length === 0) {
-        console.log("⏭️ All videos have recent analytics records (within 2 hours), skipping");
+        console.log(
+          "⏭️ All videos have recent analytics records (within 2 hours), skipping"
+        );
         return true;
       }
 
@@ -507,19 +550,23 @@ class TikTokScraper {
             video.view_count,
             video.like_count,
             video.comment_count,
-            video.share_count
+            video.share_count,
           ];
 
           await connection.execute(insertQuery, values);
           insertedCount++;
         } catch (analyticsError) {
-          console.error(`❌ Error inserting analytics for video ${video.video_id}:`, analyticsError.message);
+          console.error(
+            `❌ Error inserting analytics for video ${video.video_id}:`,
+            analyticsError.message
+          );
         }
       }
 
-      console.log(`✅ Successfully inserted ${insertedCount}/${needAnalytics.length} video analytics records`);
+      console.log(
+        `✅ Successfully inserted ${insertedCount}/${needAnalytics.length} video analytics records`
+      );
       return true;
-
     } catch (error) {
       console.error("❌ Database video analytics insert error:", error.message);
       return false;

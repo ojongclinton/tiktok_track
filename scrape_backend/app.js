@@ -2,15 +2,7 @@ import { writePool } from "./config/database.js";
 import TikTokScrapingOrchestrator from "./TikTokScrapingOrchestrator.js";
 
 // Configuration
-const PROFILES_TO_MONITOR = [
-  "mradiaa",
-  "mouton146",
-  "etitv",
-  "travisfimmel2_",
-  "le.mec.sucre",
-  "manibro229"
-  // Add your 30+ profiles here
-];
+const PROFILES_TO_MONITOR = [];
 
 const CONFIG = {
   database: {
